@@ -20,14 +20,16 @@
     <script type="text/babel">
         function DigitalSchoolPocket() {
             const [activeRole, setActiveRole] = React.useState('admin');
-            const [adminTab, setAdminTab] = React.useState('students'); // 'students' atau 'transactions'
+            const [adminTab, setAdminTab] = React.useState('students'); // 'students', 'transactions', 'monthly'
+            const [selectedClassFilter, setSelectedClassFilter] = React.useState('Semua');
             
             const [students, setStudents] = React.useState(() => {
                 const saved = localStorage.getItem('dsp_students');
                 return saved ? JSON.parse(saved) : [
-                    { nisn: '0012345678', name: 'Andi Pratama', className: '6A', balance: 150000 },
-                    { nisn: '0012345679', name: 'Siti Nurhaliza', className: '6A', balance: 85000 },
-                    { nisn: '0012345680', name: 'Budi Santoso', className: '5B', balance: 40000 }
+                    { nisn: '0012345678', name: 'Andi Pratama', className: 'Kelas 6', balance: 150000 },
+                    { nisn: '0012345679', name: 'Siti Nurhaliza', className: 'Kelas 6', balance: 85000 },
+                    { nisn: '0012345680', name: 'Budi Santoso', className: 'Kelas 5', balance: 40000 },
+                    { nisn: '0012345681', name: 'Dewi Lestari', className: 'Kelas 1', balance: 50000 }
                 ];
             });
 
@@ -39,7 +41,7 @@
             });
 
             const [inputName, setInputName] = React.useState('');
-            const [inputClass, setInputClass] = React.useState('');
+            const [inputClass, setInputClass] = React.useState('Kelas 1');
             const [inputNisn, setInputNisn] = React.useState('');
             
             const [modalStudent, setModalStudent] = React.useState(null);
@@ -77,7 +79,6 @@
                 const newStudent = { nisn: inputNisn, name: inputName, className: inputClass, balance: 0 };
                 setStudents([newStudent, ...students]);
                 setInputName('');
-                setInputClass('');
                 setInputNisn('');
                 alert('Siswa berhasil ditambahkan!');
             };
@@ -141,6 +142,25 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const todayTransactionsCount = transactions.filter(t => t.date.startsWith(todayStr)).length;
 
+            // Filter Siswa Berdasarkan Kelas
+            const filteredStudents = selectedClassFilter === 'Semua' 
+                ? students 
+                : students.filter(s => s.className === selectedClassFilter);
+
+            // Hitung Rekap Bulanan dari Transaksi
+            const monthlySummary = transactions.reduce((acc, tx) => {
+                const monthYear = tx.date.substring(0, 7); // Format YYYY-MM
+                if (!acc[monthYear]) {
+                    acc[monthYear] = { setor: 0, tarik: 0 };
+                }
+                if (tx.type === 'Setor') {
+                    acc[monthYear].setor += tx.amount;
+                } else {
+                    acc[monthYear].tarik += tx.amount;
+                }
+                return acc;
+            }, {});
+
             return (
                 <div className="max-w-4xl mx-auto p-4 sm:p-6">
                     {/* HEADER */}
@@ -194,20 +214,25 @@
                             </div>
 
                             {/* SUB TAB MENU ADMIN */}
-                            <div className="flex border-b border-slate-200 gap-4">
+                            <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
                                 <button 
                                     onClick={() => setAdminTab('students')}
-                                    className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${adminTab === 'students' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                                    Data Siswa & Saldo
+                                    className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${adminTab === 'students' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                                    Data Siswa per Kelas
                                 </button>
                                 <button 
                                     onClick={() => setAdminTab('transactions')}
-                                    className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${adminTab === 'transactions' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                                    Riwayat Transaksi Masuk/Keluar
+                                    className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${adminTab === 'transactions' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                                    Riwayat Transaksi
+                                </button>
+                                <button 
+                                    onClick={() => setAdminTab('monthly')}
+                                    className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${adminTab === 'monthly' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                                    Rekapitulasi Bulanan
                                 </button>
                             </div>
 
-                            {/* KONTEN TAB: DATA SISWA */}
+                            {/* KONTEN TAB: DATA SISWA & KELAS */}
                             {adminTab === 'students' && (
                                 <div className="space-y-6">
                                     {/* FORM TAMBAH SISWA */}
@@ -231,13 +256,17 @@
                                                 className="border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                                             />
                                             <div className="flex gap-2">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Kelas (contoh: 6A)" 
+                                                <select 
                                                     value={inputClass} 
                                                     onChange={(e) => setInputClass(e.target.value)}
-                                                    className="border border-slate-200 px-3 py-2 rounded-lg text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                                />
+                                                    className="border border-slate-200 px-3 py-2 rounded-lg text-sm flex-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                                    <option value="Kelas 1">Kelas 1</option>
+                                                    <option value="Kelas 2">Kelas 2</option>
+                                                    <option value="Kelas 3">Kelas 3</option>
+                                                    <option value="Kelas 4">Kelas 4</option>
+                                                    <option value="Kelas 5">Kelas 5</option>
+                                                    <option value="Kelas 6">Kelas 6</option>
+                                                </select>
                                                 <button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                                                     Simpan
                                                 </button>
@@ -245,10 +274,25 @@
                                         </form>
                                     </div>
 
-                                    {/* TABEL DATA SISWA */}
+                                    {/* TABEL DATA SISWA & FILTER KELAS */}
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                                        <div className="p-5 border-b border-slate-100">
+                                        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
                                             <h2 className="text-lg font-bold text-slate-800">Daftar Tabungan Siswa</h2>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-slate-500 font-medium">Filter Kelas:</span>
+                                                <select 
+                                                    value={selectedClassFilter} 
+                                                    onChange={(e) => setSelectedClassFilter(e.target.value)}
+                                                    className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium">
+                                                    <option value="Semua">Semua Kelas</option>
+                                                    <option value="Kelas 1">Kelas 1</option>
+                                                    <option value="Kelas 2">Kelas 2</option>
+                                                    <option value="Kelas 3">Kelas 3</option>
+                                                    <option value="Kelas 4">Kelas 4</option>
+                                                    <option value="Kelas 5">Kelas 5</option>
+                                                    <option value="Kelas 6">Kelas 6</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left border-collapse">
@@ -262,31 +306,39 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 text-sm">
-                                                    {students.map((student) => (
-                                                        <tr key={student.nisn} className="hover:bg-slate-50/50">
-                                                            <td className="p-4 font-medium text-slate-600">{student.nisn}</td>
-                                                            <td className="p-4 font-semibold text-slate-800">{student.name}</td>
-                                                            <td className="p-4 text-slate-600">{student.className}</td>
-                                                            <td className="p-4 font-bold text-emerald-600">Rp {student.balance.toLocaleString('id-ID')}</td>
-                                                            <td className="p-4 text-center space-x-1">
-                                                                <button 
-                                                                    onClick={() => { setModalStudent(student); setModalType('Setor'); }}
-                                                                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                                                                    Setor
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => { setModalStudent(student); setModalType('Tarik'); }}
-                                                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                                                                    Tarik
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleDeleteStudent(student.nisn)}
-                                                                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                                                                    Hapus
-                                                                </button>
-                                                            </td>
+                                                    {filteredStudents.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="5" className="p-6 text-center text-slate-400">Tidak ada data siswa untuk kelas ini.</td>
                                                         </tr>
-                                                    ))}
+                                                    ) : (
+                                                        filteredStudents.map((student) => (
+                                                            <tr key={student.nisn} className="hover:bg-slate-50/50">
+                                                                <td className="p-4 font-medium text-slate-600">{student.nisn}</td>
+                                                                <td className="p-4 font-semibold text-slate-800">{student.name}</td>
+                                                                <td className="p-4 text-slate-600">
+                                                                    <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-xs font-semibold">{student.className}</span>
+                                                                </td>
+                                                                <td className="p-4 font-bold text-emerald-600">Rp {student.balance.toLocaleString('id-ID')}</td>
+                                                                <td className="p-4 text-center space-x-1">
+                                                                    <button 
+                                                                        onClick={() => { setModalStudent(student); setModalType('Setor'); }}
+                                                                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                                                                        Setor
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => { setModalStudent(student); setModalType('Tarik'); }}
+                                                                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                                                                        Tarik
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteStudent(student.nisn)}
+                                                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                                                                        Hapus
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -338,6 +390,49 @@
                                     </div>
                                 </div>
                             )}
+
+                            {/* KONTEN TAB: REKAPITULASI BULANAN */}
+                            {adminTab === 'monthly' && (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                                    <div className="p-5 border-b border-slate-100">
+                                        <h2 className="text-lg font-bold text-slate-800">Ringkasan Total Tabungan per Bulan</h2>
+                                        <p className="text-xs text-slate-500 mt-1">Akumulasi total setoran dan penarikan berdasarkan periode bulan.</p>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                                                    <th className="p-4">Bulan / Periode</th>
+                                                    <th className="p-4">Total Setoran Masuk</th>
+                                                    <th className="p-4">Total Penarikan Keluar</th>
+                                                    <th className="p-4">Net / Selisih</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-sm">
+                                                {Object.keys(monthlySummary).length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="4" className="p-6 text-center text-slate-400">Belum ada data rekapitulasi bulanan.</td>
+                                                    </tr>
+                                                ) : (
+                                                    Object.entries(monthlySummary).map(([month, data]) => {
+                                                        const net = data.setor - data.tarik;
+                                                        return (
+                                                            <tr key={month} className="hover:bg-slate-50/50">
+                                                                <td className="p-4 font-semibold text-slate-800">{month}</td>
+                                                                <td className="p-4 font-bold text-emerald-600">+ Rp {data.setor.toLocaleString('id-ID')}</td>
+                                                                <td className="p-4 font-bold text-rose-600">- Rp {data.tarik.toLocaleString('id-ID')}</td>
+                                                                <td className={`p-4 font-bold ${net >= 0 ? 'text-teal-700' : 'text-rose-700'}`}>
+                                                                    Rp {net.toLocaleString('id-ID')}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -346,7 +441,7 @@
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center max-w-lg mx-auto">
                                 <h2 className="text-lg font-bold text-slate-800 mb-2">Cek Saldo Siswa</h2>
-                                <p className="text-xs text-slate-500 mb-4">Masukkan NISN anak Anda untuk melihat informasi saldo dan riwayat tabungan.</p>
+                                <p className="text-xs text-slate-500 mb-4">Masukkan NISN anak Anda untuk melihat informasi saldo dan detail tabungan secara spesifik.</p>
                                 <form onSubmit={handleParentSearch} className="flex gap-2">
                                     <input 
                                         type="text" 
@@ -362,16 +457,34 @@
                             </div>
 
                             {hasSearched && searchedStudent && (
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-teal-100 max-w-lg mx-auto bg-gradient-to-br from-teal-50/50 to-white">
-                                    <div className="flex justify-between items-start border-b border-teal-100 pb-4 mb-4">
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-teal-100 max-w-lg mx-auto bg-gradient-to-br from-teal-50/50 to-white space-y-4">
+                                    <div className="flex justify-between items-start border-b border-teal-100 pb-4">
                                         <div>
-                                            <span className="text-xs bg-teal-100 text-teal-800 font-semibold px-2.5 py-1 rounded-md">Kelas {searchedStudent.className}</span>
+                                            <span className="text-xs bg-teal-100 text-teal-800 font-semibold px-2.5 py-1 rounded-md">{searchedStudent.className}</span>
                                             <h3 className="text-xl font-bold text-slate-800 mt-2">{searchedStudent.name}</h3>
                                             <p className="text-xs text-slate-500">NISN: {searchedStudent.nisn}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-xs text-slate-500">Saldo Saat Ini</p>
                                             <p className="text-2xl font-bold text-emerald-600">Rp {searchedStudent.balance.toLocaleString('id-ID')}</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Riwayat Transaksi Anak Ini</h4>
+                                        <div className="max-h-48 overflow-y-auto space-y-2">
+                                            {transactions.filter(t => t.nisn === searchedStudent.nisn).length === 0 ? (
+                                                <p className="text-xs text-slate-400 text-center py-2">Belum ada transaksi untuk siswa ini.</p>
+                                            ) : (
+                                                transactions.filter(t => t.nisn === searchedStudent.nisn).map(t => (
+                                                    <div key={t.id} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-slate-100">
+                                                        <div>
+                                                            <span className={`font-semibold ${t.type === 'Setor' ? 'text-emerald-600' : 'text-rose-600'}`}>{t.type}</span>
+                                                            <span className="text-slate-400 ml-2">{t.date}</span>
+                                                        </div>
+                                                        <span className="font-bold text-slate-700">Rp {t.amount.toLocaleString('id-ID')}</span>
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
                                     </div>
                                 </div>
