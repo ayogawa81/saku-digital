@@ -20,7 +20,7 @@
     <script type="text/babel">
         function DigitalSchoolPocket() {
             const [activeRole, setActiveRole] = React.useState('admin');
-            const [adminTab, setAdminTab] = React.useState('students'); // 'students', 'transactions', 'monthly'
+            const [adminTab, setAdminTab] = React.useState('students');
             const [selectedClassFilter, setSelectedClassFilter] = React.useState('Semua');
             
             const [students, setStudents] = React.useState(() => {
@@ -142,14 +142,12 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const todayTransactionsCount = transactions.filter(t => t.date.startsWith(todayStr)).length;
 
-            // Filter Siswa Berdasarkan Kelas
             const filteredStudents = selectedClassFilter === 'Semua' 
                 ? students 
                 : students.filter(s => s.className === selectedClassFilter);
 
-            // Hitung Rekap Bulanan dari Transaksi
             const monthlySummary = transactions.reduce((acc, tx) => {
-                const monthYear = tx.date.substring(0, 7); // Format YYYY-MM
+                const monthYear = tx.date.substring(0, 7);
                 if (!acc[monthYear]) {
                     acc[monthYear] = { setor: 0, tarik: 0 };
                 }
@@ -169,26 +167,31 @@
                             <h1 className="text-2xl font-bold flex items-center gap-2">
                                 <i data-lucide="wallet" className="w-8 h-8"></i> Digital School Pocket
                             </h1>
-                            <p className="text-teal-100 text-sm mt-1">Sistem Manajemen Tabungan Siswa Modern</p>
+                            <p className="text-teal-100 text-sm mt-1">
+                                {activeRole === 'admin' ? 'Panel Utama Guru / Admin' : 'Portal Informasi Tabungan Siswa'}
+                            </p>
                         </div>
-                        <div className="flex bg-teal-800 p-1 rounded-xl border border-teal-600">
-                            <button 
-                                onClick={() => setActiveRole('admin')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeRole === 'admin' ? 'bg-white text-teal-800 shadow' : 'text-teal-100 hover:text-white'}`}>
-                                <i data-lucide="shield-check" className="w-4 h-4 inline mr-1"></i> Guru / Admin
-                            </button>
-                            <button 
-                                onClick={() => setActiveRole('parent')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeRole === 'parent' ? 'bg-white text-teal-800 shadow' : 'text-teal-100 hover:text-white'}`}>
-                                <i data-lucide="user-check" className="w-4 h-4 inline mr-1"></i> Orang Tua
-                            </button>
+                        <div className="flex items-center gap-2">
+                            {/* Tombol sakelar hanya muncul jika diakses admin, atau tombol kembali khusus orang tua */}
+                            {activeRole === 'admin' ? (
+                                <button 
+                                    onClick={() => setActiveRole('parent')}
+                                    className="bg-teal-800 hover:bg-teal-900 text-teal-100 hover:text-white px-4 py-2 rounded-xl text-sm font-medium border border-teal-600 transition-all flex items-center gap-1.5">
+                                    <i data-lucide="user-check" className="w-4 h-4"></i> Mode Orang Tua
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={() => setActiveRole('admin')}
+                                    className="bg-teal-800 hover:bg-teal-900 text-teal-100 hover:text-white px-4 py-2 rounded-xl text-sm font-medium border border-teal-600 transition-all flex items-center gap-1.5">
+                                    <i data-lucide="shield-check" className="w-4 h-4"></i> Login Guru
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     {/* DASHBOARD ADMIN */}
                     {activeRole === 'admin' && (
                         <div className="space-y-6">
-                            {/* KARTU STATISTIK */}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
                                     <div className="p-3 bg-teal-50 text-teal-600 rounded-xl"><i data-lucide="users" className="w-6 h-6"></i></div>
@@ -213,7 +216,6 @@
                                 </div>
                             </div>
 
-                            {/* SUB TAB MENU ADMIN */}
                             <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
                                 <button 
                                     onClick={() => setAdminTab('students')}
@@ -232,10 +234,8 @@
                                 </button>
                             </div>
 
-                            {/* KONTEN TAB: DATA SISWA & KELAS */}
                             {adminTab === 'students' && (
                                 <div className="space-y-6">
-                                    {/* FORM TAMBAH SISWA */}
                                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                                         <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
                                             <i data-lucide="user-plus" className="w-5 h-5 text-teal-600"></i> Tambah Siswa Baru
@@ -274,7 +274,6 @@
                                         </form>
                                     </div>
 
-                                    {/* TABEL DATA SISWA & FILTER KELAS */}
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                                         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
                                             <h2 className="text-lg font-bold text-slate-800">Daftar Tabungan Siswa</h2>
@@ -346,7 +345,6 @@
                                 </div>
                             )}
 
-                            {/* KONTEN TAB: RIWAYAT TRANSAKSI */}
                             {adminTab === 'transactions' && (
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                                     <div className="p-5 border-b border-slate-100 flex justify-between items-center">
@@ -391,7 +389,6 @@
                                 </div>
                             )}
 
-                            {/* KONTEN TAB: REKAPITULASI BULANAN */}
                             {adminTab === 'monthly' && (
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                                     <div className="p-5 border-b border-slate-100">
@@ -436,12 +433,12 @@
                         </div>
                     )}
 
-                    {/* DASHBOARD ORANG TUA */}
+                    {/* DASHBOARD ORANG TUA (Terkunci, Tidak Ada Akses ke Data Guru) */}
                     {activeRole === 'parent' && (
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center max-w-lg mx-auto">
-                                <h2 className="text-lg font-bold text-slate-800 mb-2">Cek Saldo Siswa</h2>
-                                <p className="text-xs text-slate-500 mb-4">Masukkan NISN anak Anda untuk melihat informasi saldo dan detail tabungan secara spesifik.</p>
+                                <h2 className="text-lg font-bold text-slate-800 mb-2">Cek Saldo Tabungan Anak</h2>
+                                <p className="text-xs text-slate-500 mb-4">Masukkan NISN anak Anda untuk melihat informasi saldo dan rincian transaksi secara spesifik.</p>
                                 <form onSubmit={handleParentSearch} className="flex gap-2">
                                     <input 
                                         type="text" 
