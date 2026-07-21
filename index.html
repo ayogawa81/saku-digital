@@ -13,33 +13,26 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- KONFIGURASI SUPABASE ---
+        const SUPABASE_URL = 'https://edltmcrgajlqlkmgpnss.supabase.co/rest/v1/';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkbHRtY3JnYWpscWxrbWdwbnNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTA2MzEsImV4cCI6MjEwMDIyNjYzMX0.6JW2PFhxMLK0OBiJ9tSiZvy-CdUzrprTopNSZvNBs14';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         function DigitalSchoolPocket() {
-            // Default diatur 'parent' agar saat orang lain membuka link langsung masuk ke tampilan orang tua
             const [activeRole, setActiveRole] = React.useState('parent');
             const [adminTab, setAdminTab] = React.useState('students');
             const [selectedClassFilter, setSelectedClassFilter] = React.useState('Semua');
             
-            const [students, setStudents] = React.useState(() => {
-                const saved = localStorage.getItem('dsp_students');
-                return saved ? JSON.parse(saved) : [
-                    { nisn: '0012345678', name: 'Andi Pratama', className: 'Kelas 6', balance: 150000 },
-                    { nisn: '0012345679', name: 'Siti Nurhaliza', className: 'Kelas 6', balance: 85000 },
-                    { nisn: '0012345680', name: 'Budi Santoso', className: 'Kelas 5', balance: 40000 },
-                    { nisn: '0012345681', name: 'Dewi Lestari', className: 'Kelas 1', balance: 50000 }
-                ];
-            });
-
-            const [transactions, setTransactions] = React.useState(() => {
-                const saved = localStorage.getItem('dsp_transactions');
-                return saved ? JSON.parse(saved) : [
-                    { id: '1', date: '2026-07-21 10:30', nisn: '0012345678', name: 'Andi Pratama', type: 'Setor', amount: 50000 }
-                ];
-            });
+            const [students, setStudents] = React.useState([]);
+            const [transactions, setTransactions] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
 
             const [inputName, setInputName] = React.useState('');
             const [inputClass, setInputClass] = React.useState('Kelas 1');
@@ -53,7 +46,6 @@
             const [searchedStudent, setSearchedStudent] = React.useState(null);
             const [hasSearched, setHasSearched] = React.useState(false);
 
-            // Simpan password guru (Default: guru123, bisa diganti di localStorage)
             const [adminPassword, setAdminPassword] = React.useState(() => {
                 return localStorage.getItem('dsp_admin_pwd') || 'guru123';
             });
@@ -63,19 +55,33 @@
             const [oldPwd, setOldPwd] = React.useState('');
             const [newPwd, setNewPwd] = React.useState('');
 
+            // Ambil data dari Supabase saat pertama kali dibuka
             React.useEffect(() => {
-                localStorage.setItem('dsp_students', JSON.stringify(students));
-            }, [students]);
-
-            React.useEffect(() => {
-                localStorage.setItem('dsp_transactions', JSON.stringify(transactions));
-            }, [transactions]);
+                fetchDataFromCloud();
+            }, []);
 
             React.useEffect(() => {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
             });
+
+            const fetchDataFromCloud = async () => {
+                setLoading(true);
+                try {
+                    const { data: studentData, error: studentError } = await supabase.from('students').select('*');
+                    if (studentError) console.error('Error fetching students:', studentError.message);
+                    else if (studentData) setStudents(studentData);
+
+                    const { data: txData, error: txError } = await supabase.from('transactions').select('*');
+                    if (txError) console.error('Error fetching transactions:', txError.message);
+                    else if (txData) setTransactions(txData);
+                } catch (err) {
+                    console.error('Koneksi database gagal:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
             const handleLoginAdmin = (e) => {
                 e.preventDefault();
@@ -106,7 +112,7 @@
                 setNewPwd('');
             };
 
-            const handleAddStudent = (e) => {
+            const handleAddStudent = async (e) => {
                 e.preventDefault();
                 if (!inputName || !inputClass || !inputNisn) {
                     alert('Semua kolom harus diisi!');
@@ -117,19 +123,31 @@
                     return;
                 }
                 const newStudent = { nisn: inputNisn, name: inputName, className: inputClass, balance: 0 };
+                
+                const { error } = await supabase.from('students').insert([newStudent]);
+                if (error) {
+                    alert('Gagal menyimpan ke server: ' + error.message);
+                    return;
+                }
+
                 setStudents([newStudent, ...students]);
                 setInputName('');
                 setInputNisn('');
-                alert('Siswa berhasil ditambahkan!');
+                alert('Siswa berhasil ditambahkan ke database online!');
             };
 
-            const handleDeleteStudent = (nisn) => {
+            const handleDeleteStudent = async (nisn) => {
                 if (confirm('Apakah Anda yakin ingin menghapus data siswa ini?')) {
+                    const { error } = await supabase.from('students').delete().eq('nisn', nisn);
+                    if (error) {
+                        alert('Gagal menghapus: ' + error.message);
+                        return;
+                    }
                     setStudents(students.filter(s => s.nisn !== nisn));
                 }
             };
 
-            const handleExecuteTransaction = (e) => {
+            const handleExecuteTransaction = async (e) => {
                 e.preventDefault();
                 if (!modalStudent) return;
                 const amountNum = Number(modalAmount);
@@ -142,15 +160,18 @@
                     return;
                 }
 
-                const updatedStudents = students.map(s => {
-                    if (s.nisn === modalStudent.nisn) {
-                        const newBalance = modalType === 'Setor' ? s.balance + amountNum : s.balance - amountNum;
-                        return { ...s, balance: newBalance };
-                    }
-                    return s;
-                });
+                const newBalance = modalType === 'Setor' ? modalStudent.balance + amountNum : modalStudent.balance - amountNum;
 
-                setStudents(updatedStudents);
+                // Update saldo siswa di Supabase
+                const { error: updateError } = await supabase
+                    .from('students')
+                    .update({ balance: newBalance })
+                    .eq('nisn', modalStudent.nisn);
+
+                if (updateError) {
+                    alert('Gagal memperbarui saldo: ' + updateError.message);
+                    return;
+                }
 
                 const now = new Date();
                 const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -164,10 +185,19 @@
                     amount: amountNum
                 };
 
+                // Simpan riwayat transaksi ke Supabase
+                const { error: txError } = await supabase.from('transactions').insert([newTx]);
+                if (txError) {
+                    alert('Gagal menyimpan riwayat transaksi: ' + txError.message);
+                    return;
+                }
+
+                // Update state lokal
+                setStudents(students.map(s => s.nisn === modalStudent.nisn ? { ...s, balance: newBalance } : s));
                 setTransactions([newTx, ...transactions]);
                 setModalStudent(null);
                 setModalAmount('');
-                alert(`Berhasil melakukan ${modalType} Rp ${amountNum.toLocaleString('id-ID')}`);
+                alert(`Berhasil melakukan ${modalType} Rp ${amountNum.toLocaleString('id-ID')} secara online!`);
             };
 
             const handleParentSearch = (e) => {
@@ -180,13 +210,14 @@
             const totalSavings = students.reduce((acc, curr) => acc + curr.balance, 0);
             const totalStudentsCount = students.length;
             const todayStr = new Date().toISOString().split('T')[0];
-            const todayTransactionsCount = transactions.filter(t => t.date.startsWith(todayStr)).length;
+            const todayTransactionsCount = transactions.filter(t => t.date && t.date.startsWith(todayStr)).length;
 
             const filteredStudents = selectedClassFilter === 'Semua' 
                 ? students 
                 : students.filter(s => s.className === selectedClassFilter);
 
             const monthlySummary = transactions.reduce((acc, tx) => {
+                if (!tx.date) return acc;
                 const monthYear = tx.date.substring(0, 7);
                 if (!acc[monthYear]) {
                     acc[monthYear] = { setor: 0, tarik: 0 };
@@ -199,6 +230,14 @@
                 return acc;
             }, {});
 
+            if (loading) {
+                return (
+                    <div className="flex justify-center items-center min-h-screen text-teal-700 font-semibold">
+                        Menghubungkan ke database online...
+                    </div>
+                );
+            }
+
             return (
                 <div className="max-w-4xl mx-auto p-4 sm:p-6">
                     {/* HEADER */}
@@ -208,7 +247,7 @@
                                 <i data-lucide="wallet" className="w-8 h-8"></i> Digital School Pocket
                             </h1>
                             <p className="text-teal-100 text-sm mt-1">
-                                {activeRole === 'admin' ? 'Panel Utama Guru / Admin' : 'Portal Informasi Tabungan Siswa'}
+                                {activeRole === 'admin' ? 'Panel Utama Guru / Admin' : 'Portal Informasi Tabungan Siswa (Online)'}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -284,7 +323,7 @@
                                 <div className="space-y-6">
                                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                                         <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
-                                            <i data-lucide="user-plus" className="w-5 h-5 text-teal-600"></i> Tambah Siswa Baru
+                                            <i data-lucide="user-plus" className="w-5 h-5 text-teal-600"></i> Tambah Siswa Baru (Online)
                                         </h2>
                                         <form onSubmit={handleAddStudent} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <input 
@@ -363,7 +402,7 @@
                                                                 <td className="p-4 text-slate-600">
                                                                     <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-xs font-semibold">{student.className}</span>
                                                                 </td>
-                                                                <td className="p-4 font-bold text-emerald-600">Rp {student.balance.toLocaleString('id-ID')}</td>
+                                                                <td className="p-4 font-bold text-emerald-600">Rp {Number(student.balance).toLocaleString('id-ID')}</td>
                                                                 <td className="p-4 text-center space-x-1">
                                                                     <button 
                                                                         onClick={() => { setModalStudent(student); setModalType('Setor'); }}
@@ -424,7 +463,7 @@
                                                                 </span>
                                                             </td>
                                                             <td className={`p-4 font-bold ${tx.type === 'Setor' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                {tx.type === 'Setor' ? '+' : '-'} Rp {tx.amount.toLocaleString('id-ID')}
+                                                                {tx.type === 'Setor' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
                                                             </td>
                                                         </tr>
                                                     ))
@@ -509,7 +548,7 @@
                                         </div>
                                         <div className="text-right">
                                             <p className="text-xs text-slate-500">Saldo Saat Ini</p>
-                                            <p className="text-2xl font-bold text-emerald-600">Rp {searchedStudent.balance.toLocaleString('id-ID')}</p>
+                                            <p className="text-2xl font-bold text-emerald-600">Rp {Number(searchedStudent.balance).toLocaleString('id-ID')}</p>
                                         </div>
                                     </div>
                                     <div>
@@ -524,7 +563,7 @@
                                                             <span className={`font-semibold ${t.type === 'Setor' ? 'text-emerald-600' : 'text-rose-600'}`}>{t.type}</span>
                                                             <span className="text-slate-400 ml-2">{t.date}</span>
                                                         </div>
-                                                        <span className="font-bold text-slate-700">Rp {t.amount.toLocaleString('id-ID')}</span>
+                                                        <span className="font-bold text-slate-700">Rp {Number(t.amount).toLocaleString('id-ID')}</span>
                                                     </div>
                                                 ))
                                             )}
