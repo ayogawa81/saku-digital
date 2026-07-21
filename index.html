@@ -1,1 +1,564 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Wallet, 
+  Users, 
+  ArrowLeftRight, 
+  UserPlus, 
+  Search, 
+  CheckCircle2, 
+  PlusCircle, 
+  MinusCircle, 
+  Clock, 
+  ShieldCheck, 
+  UserCheck 
+} from 'lucide-react';
 
+// --- INTERFACE / TIPE DATA ---
+interface Student {
+  nisn: string;
+  name: string;
+  className: string;
+  balance: number;
+}
+
+interface Transaction {
+  id: string;
+  date: string;
+  nisn: string;
+  name: string;
+  type: 'Setor' | 'Tarik';
+  amount: number;
+}
+
+export default function DigitalSchoolPocket() {
+  // State Navigasi: 'admin' atau 'parent'
+  const [activeRole, setActiveRole] = useState<'admin' | 'parent'>('admin');
+
+  // State Data (tersimpan di LocalStorage)
+  const [students, setStudents] = useState<Student[]>(() => {
+    const saved = localStorage.getItem('dsp_students');
+    return saved ? JSON.parse(saved) : [
+      { nisn: '0012345678', name: 'Andi Pratama', className: '6A', balance: 150000 },
+      { nisn: '0012345679', name: 'Siti Nurhaliza', className: '6A', balance: 85000 },
+      { nisn: '0012345680', name: 'Budi Santoso', className: '5B', balance: 40000 },
+    ];
+  });
+
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('dsp_transactions');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', date: '2026-07-21 10:30', nisn: '0012345678', name: 'Andi Pratama', type: 'Setor', amount: 50000 },
+    ];
+  });
+
+  // Simpan otomatis ke LocalStorage setiap ada perubahan
+  useEffect(() => {
+    localStorage.setItem('dsp_students', JSON.stringify(students));
+  }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem('dsp_transactions', JSON.stringify(transactions));
+  }, [transactions]);
+
+  // State Form Tambah Siswa
+  const [inputName, setInputName] = useState('');
+  const [inputClass, setInputClass] = useState('');
+  const [inputNisn, setInputNisn] = useState('');
+
+  // State Modal Transaksi (Setor/Tarik)
+  const [modalStudent, setModalStudent] = useState<Student | null>(null);
+  const [modalType, setModalType] = useState<'Setor' | 'Tarik'>('Setor');
+  const [modalAmount, setModalAmount] = useState('');
+
+  // State Halaman Orang Tua
+  const [parentNisnInput, setParentNisnInput] = useState('');
+  const [searchedStudent, setSearchedStudent] = useState<Student | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // --- FUNGSI ADMIN ---
+  const handleAddStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputName || !inputClass || !inputNisn) {
+      alert('Semua kolom harus diisi!');
+      return;
+    }
+    if (students.some((s) => s.nisn === inputNisn)) {
+      alert('NISN sudah terdaftar!');
+      return;
+    }
+
+    const newStudent: Student = {
+      nisn: inputNisn,
+      name: inputName,
+      className: inputClass,
+      balance: 0,
+    };
+
+    setStudents([newStudent, ...students]);
+    setInputName('');
+    setInputClass('');
+    setInputNisn('');
+    alert('Siswa berhasil ditambahkan!');
+  };
+
+  const handleOpenModal = (student: Student, type: 'Setor' | 'Tarik') => {
+    setModalStudent(student);
+    setModalType(type);
+    setModalAmount('');
+  };
+
+  const handleExecuteTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalStudent) return;
+    const amountNum = Number(modalAmount);
+    if (!amountNum || amountNum <= 0) {
+      alert('Masukkan nominal yang valid!');
+      return;
+    }
+
+    if (modalType === 'Tarik' && modalStudent.balance < amountNum) {
+      alert('Saldo tidak mencukupi untuk penarikan ini!');
+      return;
+    }
+
+    // Update Saldo Siswa
+    const updatedStudents = students.map((s) => {
+      if (s.nisn === modalStudent.nisn) {
+        return {
+          ...s,
+          balance: modalType === 'Setor' ? s.balance + amountNum : s.balance - amountNum,
+        };
+      }
+      return s;
+    });
+
+    setStudents(updatedStudents);
+
+    // Tambah Catatan Transaksi
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate().padStart ? now.getDate() : now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const newTx: Transaction = {
+      id: Date.now().toString(),
+      date: dateStr,
+      nisn: modalStudent.nisn,
+      name: modalStudent.name,
+      type: modalType,
+      amount: amountNum,
+    };
+
+    setTransactions([newTx, ...transactions]);
+    setModalStudent(null);
+    alert(`Berhasil melakukan ${modalType} Rp ${amountNum.toLocaleString('id-ID')}`);
+  };
+
+  // --- FUNGSI ORANG TUA ---
+  const handleParentSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setHasSearched(true);
+    const found = students.find((s) => s.nisn === parentNisnInput.trim());
+    setSearchedStudent(found || null);
+  };
+
+  // Statistik Ringkasan
+  const totalSavings = students.reduce((acc, curr) => acc + curr.balance, 0);
+  const totalStudentsCount = students.length;
+  // Hitung transaksi hari ini (berdasarkan tanggal hari ini)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayTransactionsCount = transactions.filter((t) => t.date.startsWith(todayStr)).length;
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      {/* HEADER UTAMA */}
+      <header className="bg-teal-700 text-white shadow-md">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white p-2 rounded-xl text-teal-700 shadow">
+              <Wallet className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-wide">Digital School Pocket</h1>
+              <p className="text-xs text-teal-100">Sistem Manajemen Tabungan Siswa Modern</p>
+            </div>
+          </div>
+
+          {/* TOMBOL NAVIGASI HALAMAN */}
+          <div className="bg-teal-800 p-1 rounded-xl flex gap-1 border border-teal-600">
+            <button
+              onClick={() => setActiveRole('admin')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeRole === 'admin'
+                  ? 'bg-white text-teal-800 shadow'
+                  : 'text-teal-100 hover:text-white hover:bg-teal-700/50'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Guru / Admin
+            </button>
+            <button
+              onClick={() => setActiveRole('parent')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeRole === 'parent'
+                  ? 'bg-white text-teal-800 shadow'
+                  : 'text-teal-100 hover:text-white hover:bg-teal-700/50'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              Orang Tua
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* KONTEN UTAMA */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {activeRole === 'admin' ? (
+          /* ================= HALAMAN GURU / ADMIN ================= */
+          <div className="space-y-8">
+            {/* 1. KARTU STATISTIK */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Total Seluruh Tabungan</p>
+                  <h3 className="text-2xl font-bold text-teal-700 mt-1">
+                    Rp {totalSavings.toLocaleString('id-ID')}
+                  </h3>
+                </div>
+                <div className="bg-teal-50 p-3 rounded-xl text-teal-600">
+                  <Wallet className="w-6 h-6" />
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Total Siswa Terdaftar</p>
+                  <h3 className="text-2xl font-bold text-slate-800 mt-1">{totalStudentsCount} Siswa</h3>
+                </div>
+                <div className="bg-teal-50 p-3 rounded-xl text-teal-600">
+                  <Users className="w-6 h-6" />
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Total Transaksi Hari Ini</p>
+                  <h3 className="text-2xl font-bold text-slate-800 mt-1">{todayTransactionsCount} Transaksi</h3>
+                </div>
+                <div className="bg-teal-50 p-3 rounded-xl text-teal-600">
+                  <ArrowLeftRight className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+
+            {/* GRID: FORM TAMBAH & TABEL SISWA */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* 2. FORM TAMBAH SISWA */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+                <div className="flex items-center gap-2 mb-4 text-teal-700">
+                  <UserPlus className="w-5 h-5" />
+                  <h2 className="font-bold text-lg text-slate-800">Tambah Siswa Baru</h2>
+                </div>
+                <form onSubmit={handleAddStudent} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Nama Lengkap</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Andi Pratama"
+                      value={inputName}
+                      onChange={(e) => setInputName(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Kelas</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 6A"
+                      value={inputClass}
+                      onChange={(e) => setInputClass(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Nomor Induk (NISN)</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 0012345678"
+                      value={inputNisn}
+                      onChange={(e) => setInputNisn(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 rounded-xl transition-all shadow-sm text-sm"
+                  >
+                    Simpan Siswa
+                  </button>
+                </form>
+              </div>
+
+              {/* 3. TABEL DAFTAR SISWA */}
+              <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-lg text-slate-800">Daftar Siswa</h2>
+                  <span className="text-xs bg-teal-50 text-teal-700 font-semibold px-2.5 py-1 rounded-full">
+                    {students.length} siswa
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase">
+                        <th className="py-3 px-2">Nama</th>
+                        <th className="py-3 px-2">Kelas</th>
+                        <th className="py-3 px-2">NISN</th>
+                        <th className="py-3 px-2">Saldo</th>
+                        <th className="py-3 px-2 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 text-sm">
+                      {students.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-6 text-slate-400">
+                            Belum ada data siswa.
+                          </td>
+                        </tr>
+                      ) : (
+                        students.map((student) => (
+                          <tr key={student.nisn} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-2 font-medium text-slate-700">{student.name}</td>
+                            <td className="py-3 px-2 text-slate-600">{student.className}</td>
+                            <td className="py-3 px-2 text-slate-500 font-mono text-xs">{student.nisn}</td>
+                            <td className="py-3 px-2 font-semibold text-teal-700">
+                              Rp {student.balance.toLocaleString('id-ID')}
+                            </td>
+                            <td className="py-3 px-2 text-right space-x-2">
+                              <button
+                                onClick={() => handleOpenModal(student, 'Setor')}
+                                className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <PlusCircle className="w-3.5 h-3.5" /> Setor
+                              </button>
+                              <button
+                                onClick={() => handleOpenModal(student, 'Tarik')}
+                                className="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <MinusCircle className="w-3.5 h-3.5" /> Tarik
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. RIWAYAT TRANSAKSI */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className="w-5 h-5 text-teal-700" />
+                <h2 className="font-bold text-lg text-slate-800">Riwayat Mutasi Transaksi</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase">
+                      <th className="py-3 px-2">Tanggal & Waktu</th>
+                      <th className="py-3 px-2">Nama Siswa</th>
+                      <th className="py-3 px-2">NISN</th>
+                      <th className="py-3 px-2">Jenis</th>
+                      <th className="py-3 px-2 text-right">Nominal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-sm">
+                    {transactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-6 text-slate-400">
+                          Belum ada transaksi tercatat.
+                        </td>
+                      </tr>
+                    ) : (
+                      transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-50/50">
+                          <td className="py-3 px-2 text-slate-500 text-xs">{tx.date}</td>
+                          <td className="py-3 px-2 font-medium text-slate-700">{tx.name}</td>
+                          <td className="py-3 px-2 font-mono text-xs text-slate-400">{tx.nisn}</td>
+                          <td className="py-3 px-2">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                tx.type === 'Setor'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-rose-50 text-rose-700'
+                              }`}
+                            >
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td
+                            className={`py-3 px-2 text-right font-semibold ${
+                              tx.type === 'Setor' ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {tx.type === 'Setor' ? '+' : '-'} Rp {tx.amount.toLocaleString('id-ID')}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ================= HALAMAN ORANG TUA ================= */
+          <div className="max-w-xl mx-auto space-y-6">
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
+              <div className="bg-teal-50 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto text-teal-700 mb-4">
+                <Search className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Cek Tabungan Anak</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Masukkan Nomor Induk Siswa Nasional (NISN) untuk memantau sisa saldo dan riwayat tabungan secara mandiri.
+              </p>
+
+              <form onSubmit={handleParentSearch} className="mt-6 flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Masukkan Nomor NISN (Contoh: 0012345678)"
+                  value={parentNisnInput}
+                  onChange={(e) => setParentNisnInput(e.target.value)}
+                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <button
+                  type="submit"
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-medium px-6 py-3 rounded-xl transition-all shadow-sm text-sm"
+                >
+                  Cek Saldo
+                </button>
+              </form>
+            </div>
+
+            {/* HASIL PENCARIAN ORANG TUA */}
+            {hasSearched && (
+              searchedStudent ? (
+                <div className="space-y-6">
+                  {/* KARTU INFORMASI SISWA */}
+                  <div className="bg-gradient-to-br from-teal-700 to-teal-900 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+                    <div className="absolute right-[-20px] bottom-[-20px] opacity-10">
+                      <Wallet className="w-48 h-48" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-1.5 bg-white/10 w-fit px-3 py-1 rounded-full text-xs font-medium text-teal-100 mb-4">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Data Terverifikasi
+                      </div>
+                      <h3 className="text-xl font-bold">{searchedStudent.name}</h3>
+                      <p className="text-teal-200 text-sm">Kelas {searchedStudent.className} • NISN: {searchedStudent.nisn}</p>
+
+                      <div className="mt-6 pt-6 border-t border-white/10">
+                        <p className="text-xs text-teal-200 uppercase tracking-wider font-semibold">Sisa Saldo Saat Ini</p>
+                        <p className="text-3xl font-extrabold mt-1">
+                          Rp {searchedStudent.balance.toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5 RIWAYAT TRANSAKSI TERAKHIR */}
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 className="font-bold text-base text-slate-800 mb-4">5 Riwayat Transaksi Terakhir</h3>
+                    <div className="space-y-3">
+                      {transactions.filter((t) => t.nisn === searchedStudent.nisn).length === 0 ? (
+                        <p className="text-center py-4 text-slate-400 text-sm">Belum ada riwayat transaksi untuk anak ini.</p>
+                      ) : (
+                        transactions
+                          .filter((t) => t.nisn === searchedStudent.nisn)
+                          .slice(0, 5)
+                          .map((tx) => (
+                            <div key={tx.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl text-sm">
+                              <div>
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-md text-xs font-semibold mr-2 ${
+                                    tx.type === 'Setor'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-rose-100 text-rose-700'
+                                  }`}
+                                >
+                                  {tx.type}
+                                </span>
+                                <span className="font-medium text-slate-700">Rp {tx.amount.toLocaleString('id-ID')}</span>
+                                <p className="text-xs text-slate-400 mt-0.5">{tx.date}</p>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-rose-50 border border-rose-100 text-rose-700 p-6 rounded-3xl text-center text-sm">
+                  Siswa dengan NISN <strong className="font-mono">{parentNisnInput}</strong> tidak ditemukan. Periksa kembali nomor NISN Anda.
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* POP-UP MODAL TRANSAKSI (SETOR / TARIK) */}
+      {modalStudent && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md p-6 rounded-3xl shadow-xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-lg text-slate-800">
+                {modalType} Tabungan - {modalStudent.name}
+              </h3>
+              <button
+                onClick={() => setModalStudent(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Saldo Saat Ini: <strong className="text-teal-700">Rp {modalStudent.balance.toLocaleString('id-ID')}</strong>
+            </p>
+
+            <form onSubmit={handleExecuteTransaction} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Nominal (Rp)</label>
+                <input
+                  type="number"
+                  placeholder="Contoh: 20000"
+                  value={modalAmount}
+                  onChange={(e) => setModalAmount(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalStudent(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition-all text-sm"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 text-white font-medium py-2.5 rounded-xl transition-all text-sm shadow-sm ${
+                    modalType === 'Setor' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  Konfirmasi {modalType}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
