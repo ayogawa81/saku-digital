@@ -81,6 +81,12 @@
                 alert('Siswa berhasil ditambahkan!');
             };
 
+            const handleDeleteStudent = (nisn) => {
+                if (confirm('Apakah Anda yakin ingin menghapus data siswa ini?')) {
+                    setStudents(students.filter(s => s.nisn !== nisn));
+                }
+            };
+
             const handleExecuteTransaction = (e) => {
                 e.preventDefault();
                 if (!modalStudent) return;
@@ -244,16 +250,21 @@
                                                     <td className="p-4 font-semibold text-slate-800">{student.name}</td>
                                                     <td className="p-4 text-slate-600">{student.className}</td>
                                                     <td className="p-4 font-bold text-emerald-600">Rp {student.balance.toLocaleString('id-ID')}</td>
-                                                    <td className="p-4 text-center">
+                                                    <td className="p-4 text-center space-x-1">
                                                         <button 
                                                             onClick={() => { setModalStudent(student); setModalType('Setor'); }}
-                                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold mr-1 transition-colors">
+                                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
                                                             Setor
                                                         </button>
                                                         <button 
                                                             onClick={() => { setModalStudent(student); setModalType('Tarik'); }}
                                                             className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
                                                             Tarik
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteStudent(student.nisn)}
+                                                            className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                                                            Hapus
                                                         </button>
                                                     </td>
                                                 </tr>
