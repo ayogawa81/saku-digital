@@ -136,19 +136,28 @@
                 alert('Siswa berhasil ditambahkan ke database online!');
             };
 
-            const handleEditStudent = async (nisn, newName) => {
+            const handleEditStudent = async (student) => {
+                const newNisn = prompt("Ubah NISN:", student.nisn);
+                if (!newNisn) return;
+                
+                const newName = prompt("Ubah Nama Siswa:", student.name);
+                if (!newName) return;
+                
+                const newClass = prompt("Ubah Kelas (contoh: Kelas 1, Kelas 2):", student.className);
+                if (!newClass) return;
+
                 const { error } = await supabase
                     .from('students')
-                    .update({ name: newName })
-                    .eq('nisn', nisn);
+                    .update({ nisn: newNisn, name: newName, className: newClass })
+                    .eq('nisn', student.nisn);
 
                 if (error) {
-                    alert('Gagal memperbarui nama siswa: ' + error.message);
+                    alert('Gagal memperbarui data siswa: ' + error.message);
                     return;
                 }
 
-                setStudents(students.map(s => s.nisn === nisn ? { ...s, name: newName } : s));
-                alert('Nama siswa berhasil diperbarui!');
+                setStudents(students.map(s => s.nisn === student.nisn ? { ...s, nisn: newNisn, name: newName, className: newClass } : s));
+                alert('Data siswa berhasil diperbarui!');
             };
 
             const handleDeleteStudent = async (nisn) => {
@@ -425,12 +434,7 @@
                                                                         Setor
                                                                     </button>
                                                                     <button 
-                                                                        onClick={() => { 
-                                                                            const newName = prompt("Ubah nama siswa:", student.name);
-                                                                            if (newName) {
-                                                                                handleEditStudent(student.nisn, newName);
-                                                                            }
-                                                                        }}
+                                                                        onClick={() => handleEditStudent(student)}
                                                                         className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
                                                                         Edit
                                                                     </button>
