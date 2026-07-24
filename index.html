@@ -128,6 +128,12 @@
                 }
 
                 try {
+                    let currentDeviceId = localStorage.getItem('dsp_device_id');
+                    if (!currentDeviceId) {
+                        currentDeviceId = 'DEV-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        localStorage.setItem('dsp_device_id', currentDeviceId);
+                    }
+
                     const { data, error } = await supabase
                         .from('licenses')
                         .select('*')
@@ -139,16 +145,41 @@
                     }
 
                     const school = data[0];
+
+                    if (school.device_id && school.device_id !== currentDeviceId) {
+                        alert('Kunci lisensi ini sudah terkunci dan aktif di perangkat lain!');
+                        return;
+                    }
+
+                    const { error: updateError } = await supabase
+                        .from('licenses')
+                        .update({ device_id: currentDeviceId })
+                        .eq('id', school.id);
+
+                    if (updateError) {
+                        alert('Gagal mengunci lisensi ke perangkat.');
+                        return;
+                    }
+
                     setIsLicensed(true);
                     setSchoolName(school.school_name);
                     localStorage.setItem('dsp_is_licensed', 'true');
                     localStorage.setItem('dsp_school_name', school.school_name);
                     setShowLicenseModal(false);
                     setLicenseKeyInput('');
-                    alert(`Lisensi aktif untuk sekolah: ${school.school_name}`);
+                    alert(`Lisensi berhasil diaktifkan untuk: ${school.school_name}`);
                 } catch (err) {
                     console.error(err);
                     alert('Terjadi kesalahan saat cek lisensi.');
+                }
+            };
+            
+            // FUNGSI SAAT TOMBOL LOGIN GURU DIKLIK
+            const handleOpenLoginGuru = () => {
+                if (!isLicensed) {
+                    setShowLicenseModal(true);
+                } else {
+                    setShowPasswordModal(true);
                 }
             };
 
@@ -261,7 +292,6 @@
                 alert(`Berhasil menambahkan ${newStudentsList.length} siswa secara masal!`);
             };
 
-            // --- FUNGSI EKSPOR CSV BERDASARKAN FILTER KELAS AKTIF ---
             const handleExportCSV = () => {
                 const dataToExport = selectedClassFilter === 'Semua' 
                     ? students 
@@ -334,10 +364,8 @@
                     return;
                 }
 
-                // Cek apakah siswa masih ada di database/state saat ini
                 const targetStudent = students.find(s => s.nisn === tx.nisn);
 
-                // Jika siswa masih ada, sesuaikan kembali saldonya
                 if (targetStudent) {
                     const adjustedBalance = tx.type === 'Setor' 
                         ? targetStudent.balance - tx.amount 
@@ -361,7 +389,6 @@
                     setStudents(students.map(s => s.nisn === tx.nisn ? { ...s, balance: adjustedBalance } : s));
                 }
 
-                // Hapus riwayat transaksi dari database Supabase (tetap berjalan meskipun siswa sudah dihapus)
                 const { error: deleteError } = await supabase
                     .from('transactions')
                     .delete()
@@ -494,19 +521,14 @@
                             </h1>
                             <p className="text-teal-100 text-sm mt-1">
                                 {activeRole === 'admin' ? 'Panel Utama Guru / Admin' : 'Portal Orang Tua (Cek Tabungan Anak)'} 
-                                <span className="ml-2 bg-teal-800 text-teal-200 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-teal-600">
-                                    Lisensi: {isLicensed ? schoolName : 'Demo'}
-                                </span>
+                                {activeRole === 'admin' && (
+                                    <span className="ml-2 bg-teal-800 text-teal-200 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-teal-600">
+                                        Lisensi: {isLicensed ? schoolName : 'Demo'}
+                                    </span>
+                                )}
                             </p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-center">
-                            {!isLicensed && (
-                                <button 
-                                    onClick={() => setShowLicenseModal(true)}
-                                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow transition-all flex items-center gap-1">
-                                    <i data-lucide="key" className="w-4 h-4"></i> Aktivasi Lisensi
-                                </button>
-                            )}
                             {activeRole === 'admin' ? (
                                 <div className="flex gap-2">
                                     <button 
@@ -538,7 +560,7 @@
                                 </div>
                             ) : (
                                 <button 
-                                    onClick={() => setShowPasswordModal(true)}
+                                    onClick={handleOpenLoginGuru}
                                     className="bg-teal-800 hover:bg-teal-900 text-teal-100 px-4 py-2 rounded-xl text-sm font-medium border border-teal-600 transition-all flex items-center gap-1.5">
                                     <i data-lucide="shield-check" className="w-4 h-4"></i> Login Guru
                                 </button>
@@ -1050,6 +1072,7 @@
                         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center p-4 z-50">
                             <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
                                 <h3 className="text-lg font-bold mb-1 text-slate-800">Aktivasi Lisensi</h3>
+                                <p className="text-xs text-slate-500 mb-3">Masukkan kunci lisensi sekolah untuk mengakses panel guru.</p>
                                 <form onSubmit={handleActivateLicense} className="space-y-4">
                                     <input 
                                         type="text" 
@@ -1194,7 +1217,6 @@
         ReactDOM.render(<DigitalSchoolPocket />, document.getElementById('root'));
     </script>
 
-    <!-- TAMBAHKAN DI SINI -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
